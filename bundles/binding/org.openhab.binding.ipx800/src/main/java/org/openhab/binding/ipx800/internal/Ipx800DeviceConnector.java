@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2016 by the respective copyright holders.
+ * Copyright (c) 2010-2019 by the respective copyright holders.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -287,6 +287,9 @@ public class Ipx800DeviceConnector extends Thread {
                 return;
             }
         }
+        if (slotType == Ipx800PortType.ANALOG){
+        	slotNumber++;
+        }
         if (slotNumber >= 0) {
             logger.trace("... for slot '{}'", slotNumber);
             postUpdate(data, slotType, slotNumber);
@@ -419,43 +422,117 @@ public class Ipx800DeviceConnector extends Thread {
         out.flush();
         waitingKeepaliveResponse = true;
     }
-
-    @Override
-    public void run() {
-        interrupted = false;
-        while (!interrupted) {
-            try {
-                waitingKeepaliveResponse = false;
-                failedKeepalive = 0;
-                connect();
-                String command;
-                while (!interrupted) {
-                    if (failedKeepalive > maxKeepAliveFailure) {
-                        throw new IOException("Max keep alive attempts has been reached");
-                    }
-                    try {
-                        command = in.readLine();
-                        if (command.equals("0") || command.equals("1")) {
-                            logger.trace("Keepalive response ok");
-                        } else {
-                            logger.debug("Receiving {}", command);
-                        }
-                        waitingKeepaliveResponse = false; // Reseting keepalive state each time we receive a command
-                        unsollicitedUpdate(command);
-                        expectedResponse = ResponseType.NONE;
-                    } catch (SocketTimeoutException e) {
-                        sendKeepalive();
-                    }
-                }
-                disconnect();
-            } catch (IOException e) {
-                logger.error(e.getMessage() + " will retry in " + reconnectTimeout + "ms");
-            }
-            try {
-                Thread.sleep(reconnectTimeout);
-            } catch (InterruptedException e) {
-                logger.error(e.getMessage());
-            }
-        }
+    
+    private void getAnalogValues ()
+    throws IOException
+    {
+    	int analogs;
+    	//String command=null;
+    
+    	
+    	
+    	analogs = Ipx800PortType.ANALOG.getPortPerDevice() * (1 + this.config.getX400length());
+        
+    	for (int i = 0; i < analogs; i++) {
+    		if (getPort (Ipx800PortType.ANALOG,i+1)!=null){
+    			 out.print("GetAn"+(i+1)+ENDL);
+    		     out.flush();
+    		        
+    		     readAnalogValues (i+1,0);
+    		     /*
+    		     command = in.readLine();
+    		 
+    		     try{
+    		    	 Integer.parseInt (command);
+    		    	 logger.debug("Getting update for Analog port, slot {}, value {}", i+1, command);
+    		    	 postUpdate(command, Ipx800PortType.ANALOG, i+1);
+    		     }
+    		     catch (NumberFormatException e){
+    		    	 unsollicitedUpdate(command);
+    		    	 
+    		     }
+    		     */
+    		}
+    	}
     }
+    
+    
+    /**
+     * MAX number of recursive calls to read the response of a GetAn<i> command.
+     */
+    static final int MAXDEEP=10;
+    
+    private void readAnalogValues (int slot,int deep)
+    throws IOException
+    {
+    	String command=null;
+    	
+    	
+    	
+		command=in.readLine ();
+
+		try{
+			Integer.parseInt (command);
+			logger.debug ("Getting value for Analog port, slot {}, value {}",slot,command);
+			postUpdate (command,Ipx800PortType.ANALOG,slot);
+		}
+		catch (NumberFormatException e){//Is not a GetAn<i> response
+			unsollicitedUpdate (command);
+			if (deep<MAXDEEP){
+				readAnalogValues (slot,deep++);
+			}
+		}
+    }
+    
+    
+    
+    
+    
+    
+
+	@Override
+	public void run ()
+	{
+		interrupted=false;
+		while (!interrupted){
+			try{
+				waitingKeepaliveResponse=false;
+				failedKeepalive=0;
+				connect ();
+				String command;
+				while (!interrupted){
+					if (failedKeepalive>maxKeepAliveFailure){
+						throw new IOException ("Max keep alive attempts has been reached");
+					}
+					try{
+						command=in.readLine ();
+						if (command.equals ("0")||command.equals ("1")){
+							logger.trace ("Keepalive response ok");
+						}
+						else{
+							logger.debug ("Receiving {}",command);
+						}
+						waitingKeepaliveResponse=false; // Reseting keepalive state each time we receive a command
+						unsollicitedUpdate (command);
+						expectedResponse=ResponseType.NONE;
+						
+						getAnalogValues ();
+					}
+					catch (SocketTimeoutException e){
+						sendKeepalive ();
+					}
+				}
+				disconnect ();
+			}
+			catch (IOException e){
+				logger.error (e.getMessage ()+" will retry in "+reconnectTimeout+"ms");
+			}
+			try{
+				Thread.sleep (reconnectTimeout);
+			}
+			catch (InterruptedException e){
+				logger.error (e.getMessage ());
+			}
+		}
+	}
 }

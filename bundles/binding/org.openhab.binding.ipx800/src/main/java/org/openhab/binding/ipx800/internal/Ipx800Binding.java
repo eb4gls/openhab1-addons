@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2016 by the respective copyright holders.
+ * Copyright (c) 2010-2019 by the respective copyright holders.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -18,6 +18,7 @@ import org.openhab.binding.ipx800.internal.Ipx800GenericBindingProvider.Ipx800Bi
 import org.openhab.binding.ipx800.internal.command.Ipx800Port;
 import org.openhab.binding.ipx800.internal.command.Ipx800PortType;
 import org.openhab.binding.ipx800.internal.exception.Ipx800UnknownDeviceException;
+import org.openhab.binding.ipx800.internal.itemslot.Ipx800InputAnalog;
 import org.openhab.binding.ipx800.internal.itemslot.Ipx800AstableSwitch;
 import org.openhab.binding.ipx800.internal.itemslot.Ipx800Consumption;
 import org.openhab.binding.ipx800.internal.itemslot.Ipx800ConsumptionPeriod;
@@ -119,85 +120,107 @@ public class Ipx800Binding extends AbstractBinding<Ipx800BindingProvider>impleme
      * @param provider
      * @throws Ipx800UnknownDeviceException
      */
-    private void createInternalItem(String itemName, BindingProvider prov) throws Ipx800UnknownDeviceException {
-        if (prov instanceof Ipx800GenericBindingProvider) {
-            Ipx800GenericBindingProvider provider = (Ipx800GenericBindingProvider) prov;
-            Ipx800BindingConfig config = provider.getBindingConfig(itemName);
-            if (config != null) {
-                Ipx800DeviceAndPort devPort = getDeviceAndPort(config.getDeviceName(), config.getPortField());
-                Ipx800DeviceConnector device = devPort.getDevice();
-                Ipx800Port port = devPort.getPort();
+	private void createInternalItem (String itemName,BindingProvider prov)
+	throws Ipx800UnknownDeviceException
+	{
+		if (prov instanceof Ipx800GenericBindingProvider){
+			Ipx800GenericBindingProvider provider=(Ipx800GenericBindingProvider)prov;
+			Ipx800BindingConfig config=provider.getBindingConfig (itemName);
+			if (config!=null){
+				Ipx800DeviceAndPort devPort=getDeviceAndPort (config.getDeviceName (),config.getPortField ());
+				Ipx800DeviceConnector device=devPort.getDevice ();
+				Ipx800Port port=devPort.getPort ();
 
-                Ipx800Item item;
-                if (port.getCommandType() == Ipx800PortType.OUPUT) {
-                    boolean pulse = false;
-                    if (config.getExtra(0).equals("p")) {
-                        pulse = true;
-                    }
-                    item = new Ipx800OutputItem(pulse);
-                } else if (port.getCommandType() == Ipx800PortType.COUNTER) {
-                    if (config.getExtra(0).equals("a")) {
-                        float unit = 1;
-                        if (!config.getExtra(1).equals("")) {
-                            unit = Float.parseFloat(config.getExtra(1));
-                        }
-                        Ipx800ConsumptionPeriod period = Ipx800ConsumptionPeriod.getPeriod(config.getExtra(2));
-                        item = new Ipx800Consumption(unit, period);
-                    } else {
-                        item = new Ipx800Counter();
-                    }
-                } else {
-                    if (config.getExtra(0).equals("D")) {
-                        item = new Ipx800DoubleClic();
-                        port.switchToMultiHandler();
-                    } else if (config.getExtra(0).equals("d")) {
-                        item = new Ipx800SimpleClic();
-                        port.switchToMultiHandler();
-                    } else if (config.getExtra(0).equals("v")) {
-                        if (config.getExtra(1).equals("")) {
-                            item = new Ipx800Dimmer();
-                        } else {
-                            item = new Ipx800Dimmer(new Integer(config.getExtra(1)));
-                        }
-                        port.switchToMultiHandler();
-                    } else if (config.getExtra(0).equals("m")) {
-                        item = new Ipx800Mirror();
-                    } else {
-                        item = new Ipx800AstableSwitch();
-                    }
-                }
-                item.setBinding(this);
-                item.setItemName(itemName);
+				Ipx800Item item;
+				if (port.getCommandType ()==Ipx800PortType.OUPUT){
+					boolean pulse=false;
+					if (config.getExtra (0).equals ("p")){
+						pulse=true;
+					}
+					item=new Ipx800OutputItem (pulse);
+				}
+				else{
+					if (port.getCommandType ()==Ipx800PortType.ANALOG){
+						item=new Ipx800InputAnalog ();	
+					}
+					else{
+						if (port.getCommandType ()==Ipx800PortType.COUNTER){
+							if (config.getExtra (0).equals ("a")){
+								float unit=1;
+								if (!config.getExtra (1).equals ("")){
+									unit=Float.parseFloat (config.getExtra (1));
+								}
+								Ipx800ConsumptionPeriod period=Ipx800ConsumptionPeriod.getPeriod (config.getExtra (2));
+								item=new Ipx800Consumption (unit,period);
+							}
+							else{
+								item=new Ipx800Counter ();
+							}
+						}
+						else{
+							if (config.getExtra (0).equals ("D")){
+								item=new Ipx800DoubleClic ();
+								port.switchToMultiHandler ();
+							}
+							else{
+								if (config.getExtra (0).equals ("d")){
+									item=new Ipx800SimpleClic ();
+									port.switchToMultiHandler ();
+								}
+								else{
+									if (config.getExtra (0).equals ("v")){
+										if (config.getExtra (1).equals ("")){
+											item=new Ipx800Dimmer ();
+										}
+										else{
+											item=new Ipx800Dimmer (new Integer (config.getExtra (1)));
+										}
+										port.switchToMultiHandler ();
+									}
+									else
+										if (config.getExtra (0).equals ("m")){
+											item=new Ipx800Mirror ();
+										}
+										else{
+											item=new Ipx800AstableSwitch ();
+										}
+								}
+							}
+						}
+					}
+				}
+				item.setBinding (this);
+				item.setItemName (itemName);
 
-                // If no to action set : null is returned
-                String toDeviceName = config.getToDeviceName();
-                if (toDeviceName.isEmpty()) {
-                    toDeviceName = config.getDeviceName();
-                }
-                Ipx800DeviceAndPort devToPort = getDeviceAndPort(toDeviceName, config.getToPortField());
-                Ipx800DeviceConnector toDevice = devToPort.getDevice();
-                Ipx800Port toPort = devToPort.getPort();
-                Ipx800OutputItem toItem = null;
-                if (toDevice != null && toPort != null) {
-                    toItem = new Ipx800OutputItem(config.isToPulse());
-                    toItem.setItemName(itemName + "-out");
-                    toItem.setBinding(this);
-                    toItem.setFromItem(item);
-                    item.setToItem(toItem);
-                    toPort.attachItem(itemName + "-out", toItem);
+				// If no to action set : null is returned
+				String toDeviceName=config.getToDeviceName ();
+				if (toDeviceName.isEmpty ()){
+					toDeviceName=config.getDeviceName ();
+				}
+				Ipx800DeviceAndPort devToPort=getDeviceAndPort (toDeviceName,config.getToPortField ());
+				Ipx800DeviceConnector toDevice=devToPort.getDevice ();
+				Ipx800Port toPort=devToPort.getPort ();
+				Ipx800OutputItem toItem=null;
+				if (toDevice!=null&&toPort!=null){
+					toItem=new Ipx800OutputItem (config.isToPulse ());
+					toItem.setItemName (itemName+"-out");
+					toItem.setBinding (this);
+					toItem.setFromItem (item);
+					item.setToItem (toItem);
+					toPort.attachItem (itemName+"-out",toItem);
 
-                }
+				}
 
-                port.attachItem(itemName, item);
-                if (toItem != null) {
-                    logger.info("Item {} created using {}, attached to {} on port {} to item {}", itemName, item,
-                            device, port, toItem);
-                } else {
-                    logger.info("Item {} created using {}, attached to {} on port {}", itemName, item, device, port);
-                }
-            }
-        }
-    }
+				port.attachItem (itemName,item);
+				if (toItem!=null){
+					logger.info ("Item {} created using {}, attached to {} on port {} to item {}",itemName,item,device,port,toItem);
+				}
+				else{
+					logger.info ("Item {} created using {}, attached to {} on port {}",itemName,item,device,port);
+				}
+			}
+		}
+	}
 
     @Override
     public void activate() {

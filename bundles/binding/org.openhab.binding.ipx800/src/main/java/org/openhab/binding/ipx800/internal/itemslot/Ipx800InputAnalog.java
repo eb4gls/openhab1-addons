@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2019 by the respective copyright holders.
+ * Copyright (c) 2010-2016 by the respective copyright holders.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -8,41 +8,42 @@
  */
 package org.openhab.binding.ipx800.internal.itemslot;
 
-import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.types.State;
 import org.openhab.core.types.Type;
 
 /**
- * Mirror switch item
+ * Analog item
  * 
- * @author Seebag
+ * @author fjavier
  * @since 1.8.0
  *
  */
-public class Ipx800Mirror extends Ipx800Item {
-    public Ipx800Mirror() {
-        lastState = OnOffType.OFF;
+public class Ipx800InputAnalog extends Ipx800Item {
+    private int lastState = 0;
+    
+   
+    public Ipx800InputAnalog ()
+    {
     }
 
     @Override
     public State getState() {
-        return lastState;
+        return new DecimalType(lastState);
     }
 
     @Override
     protected Type toState(String state) {
-        return state.charAt(0) == '1' ? OnOffType.ON : OnOffType.OFF;
+        return new DecimalType(Integer.parseInt(state));
     }
+    
 
     @Override
     protected boolean updateStateInternal(Type state) {
-        boolean changed = false;
-        if (state instanceof OnOffType) {
-            OnOffType commandState = (OnOffType) state;
-            changed = commandState.compareTo((OnOffType) lastState) != 0;
-            lastState = commandState;
+        if (state instanceof DecimalType) {
+            lastState = ((DecimalType) state).intValue();
         }
-        return changed;
+        return true;
     }
 
 }
